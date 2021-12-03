@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vkfw/vkfw.hpp>
 #include "../util/util.h"
 
 // Interfaces with gl/vkfw

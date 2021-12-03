@@ -8,6 +8,7 @@ namespace Util{
     struct AnyPtr{
         void* ptr;
         template <typename T> inline AnyPtr(T* ptr): ptr(reinterpret_cast<T*>(ptr)){}
+                              inline AnyPtr(std::nullptr_t): ptr(nullptr){}
         template <typename T> inline operator T*(){ return reinterpret_cast<T*>(ptr); }
         template <typename T> inline T* operator->(){ return reinterpret_cast<T*>(ptr); }
     };
@@ -55,7 +56,7 @@ namespace Util{
         double delta;
         inline void start(){
             lastFrameTime = vkfw::getTime();
-            delta = 0.0d;
+            delta = 0.0f;
         }
         inline void update(){
             auto time = vkfw::getTime();

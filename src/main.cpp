@@ -40,6 +40,8 @@
 
 #include "render/render.h"
 #include "render/screen.h"
+#include "render/input.h"
+#include "render/camera.h"
 #include "util/util.h"
 
 
@@ -77,23 +79,23 @@ ShaderData shaderData[] = { // positions, colours, uv maps
     // {{-0.5f / 2, 0.5f * float(sqrt(3)) / 6,     0.0f}, /* Inner left  */ {0.9f, 0.45f, 0.17f}, {0.0f, 0.0f}},
     // {{ 0.5f / 2, 0.5f * float(sqrt(3)) / 6,     0.0f}, /* Inner right */ {0.0f, 0.0f , 0.0f }, {0.0f, 0.0f}},
     // {{ 0.0f,    -0.5f * float(sqrt(3)) / 3,     0.0f}, /* Inner down  */ {0.5f, 0.5f , 0.5f }, {0.0f, 0.0f}},   
-    {{-0.5f, 0.0f,  0.5f}, {0.0f, 1.0f , 0.0f }, {0.0f, 0.0f,}},
-    {{-0.5f, 0.0f, -0.5f}, {0.0f, 0.0f , 1.0f }, {5.0f, 0.0f,}},
-    {{ 0.5f, 0.0f, -0.5f}, {1.0f, 0.0f , 0.0f }, {0.0f, 0.0f,}},
-    {{ 0.5f, 0.0f,  0.5f}, {0.9f, 0.45f, 0.17f}, {5.0f, 0.0f,}},
-    {{ 0.0f, 0.8f,  0.0f}, {0.0f, 0.0f , 0.0f }, {2.5f, 5.0f }},
+    {{ 0.0f, 1.0f, 0.0f}, {0.0f, 1.0f , 0.0f }, {0.5f, 1.0f,}}, // Pyramid top
+    {{-0.5f, 0.0f, 0.5f}, {0.0f, 0.0f , 1.0f }, {0.0f, 0.0f,}}, // Left
+    {{ 0.5f, 0.0f, 0.5f}, {1.0f, 0.0f , 0.0f }, {1.0f, 0.0f,}}, // Right
+    {{-0.5f, 0.0f,-0.5f}, {1.0f, 1.0f , 1.0f }, {0.0f, 0.0f,}}, // Back
+    {{ 0.5f, 0.0f,-0.5f}, {0.9f, 0.45f, 0.17f}, {1.0f, 0.0f }},
 };
 glm::vec<3, GLuint> indices[] = { // Points to use to make a tringle
     // {0, 3, 5}, // Lower left triangle
     // {3, 2, 4}, // Lower right triangle
     // {5, 4, 1} // Upper triangle
     // {0,1,2} // tringle
-    {0, 1, 2}, // pyramid
-	{0, 2, 3}, // pyramid
-	{0, 1, 4}, // pyramid
-	{1, 2, 4}, // pyramid
-	{2, 3, 4}, // pyramid
-	{3, 0, 4}, // pyramid
+    {0, 1, 2}, // front
+    {0, 3, 4}, // back
+    {0, 1, 3}, // left
+    {0, 2, 4}, // right
+    // {2, 3, 4}, // bottom
+    // {3, 0, 4}, // bottom TODO
 };
 
 using namespace Render; // TODO: sub in
@@ -107,6 +109,7 @@ class Instance{
     Textures2D obamium;
     ShaderProgram shaderProgram;
         ShaderUniform colourScale, tex0, Umodel, Uview, Uproj;
+    Camera activeCamera;
 
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4  view = glm::mat4(1.0f);
@@ -171,6 +174,7 @@ class Instance{
 
         // Texture
         int widthImg, heightImg, channelsImg;
+        stbi_set_flip_vertically_on_load(true);
         uint8_t* textureData = stbi_load("resources/Obamium.jpg", &widthImg, &heightImg, &channelsImg, 0);
         if(textureData == nullptr){
             std::cout << stbi_failure_reason() << "\n"
@@ -182,8 +186,8 @@ class Instance{
         obamium.use();
         Textures2D::setParamI(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         Textures2D::setParamI(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        // Textures2D::setParamI(GL_TEXTURE_WRAP_S, GL_REPEAT);
-        // Textures2D::setParamI(GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        Textures2D::setParamI(GL_TEXTURE_WRAP_S, GL_REPEAT);
+        Textures2D::setParamI(GL_TEXTURE_WRAP_T, GL_REPEAT);
         //  // Extra lines in case you choose to use GL_CLAMP_TO_BORDER
         // float flatColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
         // glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, flatColor);
@@ -210,20 +214,46 @@ class Instance{
         Uproj.setUniform(proj);
 
         screen.frameTimes.start();
+        glEnable(GL_DEPTH_TEST); // Disable for fun
 
         screen.window->callbacks()->on_framebuffer_resize = std::bind(resize_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+        input::vkfwSetupCallbacksForWindow(*screen.window);
+        setupCameraInput(activeCamera);
         return 0;
+    }
+
+    constexpr static input::Key keyW{vkfw::Key::W};
+    constexpr static input::Key keyS{vkfw::Key::S};
+    constexpr static input::Key keyA{vkfw::Key::A};
+    constexpr static input::Key keyD{vkfw::Key::D};
+    static void onCameraEvent(Camera camera, input::InputEvent event){
+        using namespace input;
+        std::cout << "W event";
+        // glm::vec2 cameraMovementVector = {1.0f, 1.0f};
+    };
+    void setupCameraInput(Camera cam){
+        using namespace input;
+        using namespace input::Actions;
+        InputHandler handle = {
+            {
+                {keyW, MonitoredActions(PRESS|RELEASE)},
+                {keyS, MonitoredActions(PRESS|RELEASE)},
+                {keyA, MonitoredActions(PRESS|RELEASE)},
+                {keyD, MonitoredActions(PRESS|RELEASE)},
+            }, std::bind(onCameraEvent, cam, std::placeholders::_1)
+        };
+        inputSystem.addHandler(handle);
     }
 
     void draw(){
         if(!screen.shouldRender){ std::this_thread::sleep_for(std::chrono::milliseconds(1000/60)); }
         screen.frameTimes.update();
         glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         shaderProgram.use();
         colourScale.setUniform(1.5f);
         // model, rotation amount (90deg/s), axis weighting
-        model = glm::rotate(model, (float)glm::radians(90*screen.frameTimes.delta), glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, (float)glm::radians(105*screen.frameTimes.delta), glm::vec3(0.0f, 1.0f, 0.0f));
         // model = glm::rotate(model, (float)glm::radians(180*presentTime.delta), glm::vec3(0.0f, 0.0f, 1.0f));
         Umodel.setUniform(model);
         obamium.use();
@@ -259,6 +289,8 @@ class Instance{
     ~Instance(){ }
 
 };
+
+#include "util/registry.h"
 
 int main(){
     #ifdef OS_WINDOWS

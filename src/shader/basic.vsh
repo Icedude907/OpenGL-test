@@ -11,7 +11,7 @@ uniform mat4 view;
 uniform mat4 proj;
 
 void main(){
-    // gl_Position is hard coded
+    // gl_Position is hard coded. Order of mul matters
     gl_Position = proj * view * model * vec4(pos.xyz, 1.0f);
     colour = vertexColour;
     texCoord = tex;
