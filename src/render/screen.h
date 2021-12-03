@@ -2,6 +2,7 @@
 
 #include <vkfw/vkfw.hpp>
 #include "../util/util.h"
+#include "frametimer.h"
 
 // Interfaces with gl/vkfw
 namespace Render{
@@ -12,7 +13,7 @@ namespace Render{
         vkfw::UniqueInstance glfwInstance;
         vkfw::UniqueWindow window;
 
-        Util::GLFWTimer frameTimes;
+        Render::FrameTimer frameTimes;
 
         bool init(char const* title, size_t width, size_t height, GLFWerrorfun error_callback = nullptr){
             this->width = width;

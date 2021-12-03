@@ -50,18 +50,4 @@ namespace Util{
             return initial;
         }
     };
-
-    struct GLFWTimer{
-        double lastFrameTime;
-        double delta;
-        inline void start(){
-            lastFrameTime = vkfw::getTime();
-            delta = 0.0f;
-        }
-        inline void update(){
-            auto time = vkfw::getTime();
-            delta = time - lastFrameTime;
-            lastFrameTime = time;
-        }
-    };
 }
