@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <variant>
 
 #include <vkfw/vkfw.hpp>
 
@@ -16,11 +17,11 @@
 */
 namespace input{
     struct Key{
-        vkfw::Key key;
-        inline bool operator==(const Key& rhs){
-            return key == rhs.key;
+        std::variant<vkfw::Key, vkfw::MouseButton> key;
+        constexpr inline friend bool operator==(const Key& lhs, const Key& rhs){
+            return lhs.key == rhs.key;
         }
-        inline friend bool operator<(const Key& lhs, const Key& rhs){
+        constexpr inline friend bool operator<(const Key& lhs, const Key& rhs){
             return lhs.key < rhs.key;
         }
     };
@@ -29,6 +30,9 @@ namespace input{
     namespace Actions{
         constexpr Action PRESS   = 0b00000001;
         constexpr Action RELEASE = 0b00000010;
+        constexpr inline bool pressed(Action action){
+            return action & PRESS;
+        }
     }
     struct MonitoredActions{
         bool press : 1;
@@ -56,6 +60,21 @@ namespace input{
         SourceDevice device;
 
         inline InputEvent(Key key, Action action): key(key), action(action){}
+
+        // Returns true if functionally equvilent
+        constexpr inline friend bool operator==(const InputEvent& lhs, const InputEvent& rhs){
+            return lhs.key == rhs.key && lhs.action == rhs.action;
+        }
+        // Can i do this implicitly?
+        constexpr inline bool matches(Key k){
+            return key == k;
+        }
+        constexpr inline bool matches(Key k, Action a){
+            return key == k && action == a;
+        }
+        constexpr inline bool pressed(){
+            return Actions::pressed(action);
+        }
     };
     struct InputEventMontior{
         Key key;
@@ -70,6 +89,12 @@ namespace input{
         std::vector<InputEventMontior> monitoredEvents; 
         std::function<void(InputEvent)> onEvent;
     };
+    /** The key to the input system
+     * Holds a list of registered handlers for specific input events
+     * If multiple handlers are bound to the same key, they will all trigger
+     * When a handler's condition is satisfied, it will immediately execute on the input thread
+     * - If you want something that runs every frame, add it to the correct registry and then remove it when appropriate
+    */
     struct Inputs{
         using handlerID = size_t;
         Util::Registry<InputHandler, std::map, handlerID> registeredHandlers;
@@ -113,10 +138,22 @@ namespace input{
                 inputSystem.release(Key{key});
             }
         }
+        void mousebuttonhandler(const vkfw::Window& window, vkfw::MouseButton button, vkfw::MouseButtonAction action, vkfw::ModifierKeyFlags modifiers){
+            if(action == vkfw::MouseButtonAction::Press){
+                inputSystem.press(Key{button});
+            }else if(action == vkfw::MouseButtonAction::Release){
+                inputSystem.release(Key{button});
+            }
+        }
     }
 
     void vkfwSetupCallbacksForWindow(const vkfw::Window& window){
         using namespace std::placeholders;
-        window.callbacks()->on_key = callbacks::keyboardhandler;
+        auto cb = window.callbacks();
+        cb->on_key = callbacks::keyboardhandler;
+        if(vkfw::rawMouseMotionSupported()){
+            window.set<vkfw::InputMode::RawMouseMotion>(true);
+        }
+        cb->on_mouse_button = callbacks::mousebuttonhandler;
     }
 }

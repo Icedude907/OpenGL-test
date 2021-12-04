@@ -7,12 +7,11 @@ layout(location = 2) in  vec2 tex;
                      out vec2 texCoord;
 
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 proj;
+uniform mat4 projview;
 
 void main(){
     // gl_Position is hard coded. Order of mul matters
-    gl_Position = proj * view * model * vec4(pos.xyz, 1.0f);
+    gl_Position = projview * model * vec4(pos.xyz, 1.0f);
     colour = vertexColour;
     texCoord = tex;
 }

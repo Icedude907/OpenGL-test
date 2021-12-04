@@ -108,12 +108,11 @@ class Instance{
     ElementBuffers EBO;
     Textures2D obamium;
     ShaderProgram shaderProgram;
-        ShaderUniform colourScale, tex0, Umodel, Uview, Uproj;
+        ShaderUniform colourScale, tex0, Umodel, Uprojview;
     Camera activeCamera;
 
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4  view = glm::mat4(1.0f);
-    glm::mat4  proj = glm::mat4(1.0f);
+    glm::mat4 model    = glm::mat4(1.0f);
+    glm::mat4 projview = glm::mat4(1.0f);
     float nearplane = 0.1f, farplane = 100.0f;
 
     Screen screen;
@@ -201,17 +200,14 @@ class Instance{
         colourScale = shaderProgram.getUniform("colourScale");
         tex0 = shaderProgram.getUniform("tex0");
         Umodel = shaderProgram.getUniform("model");
-        Uview = shaderProgram.getUniform("view");
-        Uproj = shaderProgram.getUniform("proj");
+        Uprojview = shaderProgram.getUniform("projview");
 
-        view = glm::translate(view, glm::vec3(0.0f, -0.5f, -2.0f)); // Shift the world by this
-        proj = glm::perspective(glm::radians(45.0f), (float)screen.width / screen.height, nearplane, farplane);
+        projview = activeCamera.generateViewProjectionMatrix(screen.width, screen.height);
 
         shaderProgram.use();
         tex0.setUniform(0); // Sampler2D index 0 Corresponds to activated texture 0 and so on.
         Umodel.setUniform(model);
-        Uview.setUniform(view);
-        Uproj.setUniform(proj);
+        Uprojview.setUniform(projview);
 
         screen.frameTimes.start();
         glEnable(GL_DEPTH_TEST); // Disable for fun
@@ -222,25 +218,68 @@ class Instance{
         return 0;
     }
 
-    constexpr static input::Key keyW{vkfw::Key::W};
-    constexpr static input::Key keyS{vkfw::Key::S};
-    constexpr static input::Key keyA{vkfw::Key::A};
-    constexpr static input::Key keyD{vkfw::Key::D};
-    static void onCameraEvent(Camera camera, input::InputEvent event){
-        using namespace input;
-        std::cout << "W event";
-        // glm::vec2 cameraMovementVector = {1.0f, 1.0f};
+    constexpr static input::Key 
+        keyW{vkfw::Key::W},
+        keyS{vkfw::Key::S},
+        keyA{vkfw::Key::A},
+        keyD{vkfw::Key::D},
+        keySp{vkfw::Key::Space},
+        keySh{vkfw::Key::LeftShift},
+        keyLc{vkfw::MouseButton::Left},
+        keyR{vkfw::Key::R},
+        keyEsc{vkfw::Key::Escape},
+        keyQ{vkfw::Key::Q},
+        keyE{vkfw::Key::E};
+    glm::vec3 camMoveVec = glm::vec3(0.f,0.f,0.f);
+    glm::vec3 camRotVec = glm::vec3(0.f,0.f,0.f);
+    void onCameraEvent(input::InputEvent e){
+        // X Y Z
+        using namespace input::Actions;
+        static bool forward, back, left, right, up, down = false;
+        static bool pitchL, pitchR = false;
+        static bool captureMouse = false;
+        if(e.matches(keyR) ){ activeCamera.resetRotation(); }
+        if(e.matches(keyEsc, PRESS)){ captureMouse = false; }
+        if(e.matches(keyLc,  PRESS)){ captureMouse = true; }
+
+        if(e.matches(keyW) ){ forward = e.pressed(); }
+        if(e.matches(keyS) ){    back = e.pressed(); }
+        if(e.matches(keyA) ){    left = e.pressed(); }
+        if(e.matches(keyD) ){   right = e.pressed(); }
+        if(e.matches(keySp)){      up = e.pressed(); }
+        if(e.matches(keySh)){    down = e.pressed(); }
+        if(e.matches(keyQ) ){  pitchL = e.pressed(); }
+        if(e.matches(keyE) ){  pitchR = e.pressed(); }
+        auto computeCamMovVec = [&](){
+            glm::vec3 mov = glm::vec3(0.0f, 0.0f, 0.0f);
+            glm::vec3 rot = glm::vec3(0.0f, 0.0f, 0.0f);
+            if(right^left)   { mov.x = activeCamera.speed*(right-left); }
+            if(up^down)      { mov.y = activeCamera.speed*(up-down); }
+            if(forward^back) { mov.z = activeCamera.speed*(back-forward); } // -z is into page
+            if(pitchL^pitchR){ rot.z = activeCamera.speed*(pitchL-pitchR); }
+
+            camMoveVec = mov;
+            camRotVec = rot;
+        };
+        computeCamMovVec();
     };
     void setupCameraInput(Camera cam){
         using namespace input;
         using namespace input::Actions;
         InputHandler handle = {
             {
-                {keyW, MonitoredActions(PRESS|RELEASE)},
-                {keyS, MonitoredActions(PRESS|RELEASE)},
-                {keyA, MonitoredActions(PRESS|RELEASE)},
-                {keyD, MonitoredActions(PRESS|RELEASE)},
-            }, std::bind(onCameraEvent, cam, std::placeholders::_1)
+                {keyEsc, PRESS|RELEASE},
+                {keyR, PRESS|RELEASE},
+                {keyW, PRESS|RELEASE},
+                {keyS, PRESS|RELEASE},
+                {keyA, PRESS|RELEASE},
+                {keyD, PRESS|RELEASE},
+                {keySp, PRESS|RELEASE},
+                {keySh, PRESS|RELEASE},
+                {keyLc, PRESS|RELEASE},
+                {keyQ, PRESS|RELEASE},
+                {keyE, PRESS|RELEASE},
+            }, std::bind(onCameraEvent, this, std::placeholders::_1)
         };
         inputSystem.addHandler(handle);
     }
@@ -254,8 +293,11 @@ class Instance{
         colourScale.setUniform(1.5f);
         // model, rotation amount (90deg/s), axis weighting
         model = glm::rotate(model, (float)glm::radians(105*screen.frameTimes.delta), glm::vec3(0.0f, 1.0f, 0.0f));
-        // model = glm::rotate(model, (float)glm::radians(180*presentTime.delta), glm::vec3(0.0f, 0.0f, 1.0f));
         Umodel.setUniform(model);
+        activeCamera.pos += camMoveVec * (float)screen.frameTimes.delta;
+        activeCamera.rot += camRotVec * (float)screen.frameTimes.delta;
+        projview = activeCamera.generateViewProjectionMatrix(screen.width, screen.height);
+        Uprojview.setUniform(projview);
         obamium.use();
         VAO.use();
         // 4th arg is a pointer to indices if VBOs aren't being used (but they are so we keep it null)
@@ -279,9 +321,6 @@ class Instance{
     void resize_callback(const vkfw::Window& window, size_t width, size_t height){
         screen.resize(width, height);
         if(screen.shouldRender){
-            // recompute projection matrix
-            proj = glm::perspective(glm::radians(45.0f), (float)width / height, nearplane, farplane);
-            Uproj.setUniform(proj);
             draw();
         }
     }
