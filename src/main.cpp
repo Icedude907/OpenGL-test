@@ -107,13 +107,14 @@ class Instance{
     ShaderProgram shaderProgram;
         ShaderUniform colourScale, tex0, Umodel, Uprojview;
     Camera activeCamera;
-    Game::CameraController camctrl = Game::CameraController(activeCamera);
 
     glm::mat4 model    = glm::mat4(1.0f);
     glm::mat4 projview = glm::mat4(1.0f);
     float nearplane = 0.1f, farplane = 100.0f;
 
     Screen screen;
+
+    Game::CameraController camctrl = Game::CameraController(activeCamera, screen);
 
     public:
     int run(){
@@ -223,8 +224,7 @@ class Instance{
         shaderProgram.use();
         model = glm::rotate(model, (float)glm::radians(105*screen.frameTimes.delta), glm::vec3(0.0f, 1.0f, 0.0f));
         Umodel.setUniform(model);
-        activeCamera.pos += camctrl.camMoveVec * (float)screen.frameTimes.delta;
-        activeCamera.rot += camctrl.camRotVec * (float)screen.frameTimes.delta;
+        camctrl.applyFrameMovement();
         projview = activeCamera.generateViewProjectionMatrix(screen.width, screen.height);
         Uprojview.setUniform(projview);
         obamium.use();

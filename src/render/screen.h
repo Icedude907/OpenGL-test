@@ -77,14 +77,17 @@ namespace Render{
         inline void present(){
             window->swapBuffers();
         }
+        inline void setMouseCapture(vkfw::CursorMode val){
+            window->set<vkfw::InputMode::Cursor>(val);
+        }
+        inline void moveMouse(double x, double y){
+            window->setCursorPos(x, y);
+        }
         private:
         inline void updateShouldRender(){ shouldRender = !(width == 0 || height == 0); }
         inline void resizeViewport(){ glViewport(0, 0, this->width, this->height); }
         static void default_error_callback(int error_code, const char* description){
             std::cerr << "Error: " << description << std::endl;
-        }
-        inline void setMouseCapture(vkfw::CursorMode val){
-            window->set<vkfw::InputMode::Cursor>(val);
         }
 
         void vkfwSetupCallbacksForWindow(){

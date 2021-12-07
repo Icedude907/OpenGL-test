@@ -68,7 +68,7 @@ namespace Input{
             }
         };
         struct MousePos{
-            double x, y;
+            // No trigger fields. Just "moved".
         };
         struct Analog{
             
@@ -136,11 +136,17 @@ namespace Input{
                 }
             }
         }
-        inline std::optional<size_t> addButtonHandler(const ButtonInputHandler& handler){
+        inline std::optional<size_t> addHandler(const ButtonInputHandler& handler){
             return buttonHandlers.insert(handler);
+        }
+        inline std::optional<size_t> addHandler(const MousePosInputHandler& handler){
+            return mouseHandlers.insert(handler);
         }
         inline bool removeButtonHandler(const size_t id){
             return buttonHandlers.erase(id);
+        }
+        inline bool removeMousePosHandler(const size_t id){
+            return mouseHandlers.erase(id);
         }
     };
     static InputInstance inputSystem;
