@@ -75,28 +75,30 @@ namespace Render{
             glShaderSource(shader, n, sources, lens);
             glCompileShader(shader);
             #ifndef DEBUG_SHADERS
-                printCompilerErrors();
+                printShaderCompilerErrors();
             #endif
         }
         inline Shader(const GLchar* source, const GLint len)
         : Shader(&source, &len, 1){
         }
+        inline Shader(const Util::LenPtr<GLchar, GLint> source)
+        : Shader(source.ptr, source.len){
+        }
 
         inline void Delete(){ glDeleteShader(shader); }
         inline operator GLuint(){ return shader; }
 
-        void printCompilerErrors(){
+        void printShaderCompilerErrors(){
             // Stores status of compilation
             GLint hasCompiled;
             // Character array to store error message in
             char infoLog[1024];
             glGetShaderiv(shader, GL_COMPILE_STATUS, &hasCompiled);
-            if (hasCompiled == GL_FALSE){
+            if (hasCompiled == GL_FALSE){ // TODO: is this working?
                 glGetShaderInfoLog(shader, 1024, NULL, infoLog);
                 std::cout << "SHADER_COMPILATION_ERROR for:" 
-                    << (type == GL_VERTEX_SHADER 
-                        ? "VERTEX"
-                        : "FRAGMENT") << "\n" << infoLog << std::endl;
+                    << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT") 
+                    << "\n" << infoLog << std::endl;
             }
         }
     };

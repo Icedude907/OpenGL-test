@@ -22,9 +22,6 @@ struct Camera{
     float nearplane = 0.01f;
     float farplane = 100.0f;
 
-    float speed = 2.0f; // units/s
-    float sensitivity = 100.0f;
-
     inline Camera(){
     }
 

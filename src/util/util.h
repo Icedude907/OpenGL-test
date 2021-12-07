@@ -12,34 +12,27 @@ namespace Util{
         template <typename T> inline operator T*(){ return reinterpret_cast<T*>(ptr); }
         template <typename T> inline T* operator->(){ return reinterpret_cast<T*>(ptr); }
     };
-    template <typename T>
+    template <typename T, typename Len_t = size_t>
     struct LenPtr{
         T* ptr;
-        size_t len;
+        Len_t len;
+        using ThisType = LenPtr<T, Len_t>;
 
         // basic
         inline LenPtr(){}
-        inline LenPtr(size_t len): ptr(new T[len]), len(len){}
-        inline LenPtr(T* ptr, size_t len): ptr(ptr), len(len){}
+        inline LenPtr(Len_t len): ptr(new T[len]), len(len){}
+        inline LenPtr(T* ptr, Len_t len): ptr(ptr), len(len){}
         // copy
-        inline LenPtr(const LenPtr<T>& fromThis): ptr(fromThis.ptr), len(fromThis.len){};
-        constexpr LenPtr<T>& operator=(const LenPtr<T>&) = default;
-        // move
-        // ptrWLen(ptrWLen<T>&& fromThis): ptr(fromThis.ptr), len(fromThis.len){
-        //     fromThis.ptr = 0;
-        //     fromThis.len = 0;
-        // }
+        inline LenPtr(const ThisType& fromThis): ptr(fromThis.ptr), len(fromThis.len){};
+        constexpr ThisType& operator=(const ThisType&) = default;
 
         // conversion
-        template <typename fromType>
-        LenPtr(const LenPtr<fromType>& fromThis): ptr(reinterpret_cast<T*>(fromThis.ptr)), len(fromThis.len){}
+        template <typename fromT, typename fromLen_t>
+        LenPtr(const LenPtr<fromT, fromLen_t>& fromThis): ptr(reinterpret_cast<T*>(fromThis.ptr)), len(fromThis.len){}
 
         inline T& operator[](size_t i){ return ptr[i]; }
-        inline void free(){
-            delete[] ptr;
-        }
+        inline void free(){ delete[] ptr; }
     };
-    // BROKEN: REDO
     template <typename T>
     struct PostfixAccumulator{
         T data;

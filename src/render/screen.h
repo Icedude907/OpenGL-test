@@ -1,11 +1,38 @@
 #pragma once
 
 #include <vkfw/vkfw.hpp>
-#include "../util/util.h"
 #include "frametimer.h"
+#include "glload.h"
+#include "../input/input.h"
+#include "../util/util.h"
 
 // Interfaces with gl/vkfw
+// Also loads gl3w functions
 namespace Render{
+    namespace callbacks{
+        namespace vkfw{
+            using namespace ::vkfw;
+            using namespace ::Input;
+            void keyboard(const Window& window, Key key, int32_t scancode, KeyAction action, ModifierKeyFlags modifiers){
+                if(action == vkfw::KeyAction::Press){
+                    inputSystem.buttonPress(key);
+                }else if(action == vkfw::KeyAction::Release){
+                    inputSystem.buttonRelease(key);
+                }
+            }
+            void mousebutton(const Window& window, MouseButton button, MouseButtonAction action, ModifierKeyFlags modifiers){
+                if(action == MouseButtonAction::Press){
+                    inputSystem.buttonPress(button);
+                }else if(action == MouseButtonAction::Release){
+                    inputSystem.buttonRelease(button);
+                }
+            }
+            void mousemove(const Window& window, double x, double y){
+                inputSystem.mouseMove(x, y);
+            }
+        }
+    }
+
     struct Screen{
         size_t width, height;
         bool shouldRender;
@@ -15,7 +42,7 @@ namespace Render{
 
         Render::FrameTimer frameTimes;
 
-        bool init(char const* title, size_t width, size_t height, GLFWerrorfun error_callback = nullptr){
+        bool init(char const* title, size_t width, size_t height, GLFWerrorfun error_callback = default_error_callback){
             this->width = width;
             this->height = height;
             glfwInstance = vkfw::initUnique(); // Unique automatically deallocates
@@ -32,16 +59,13 @@ namespace Render{
             }
             window->makeContextCurrent();
 
-            if(gl3wInit()){
-                std::cerr << "Failed to initialize OpenGL (gl3w)\n";
-                return false;
-            }
-            if(!gl3wIsSupported(4,6)){
-                std::cerr << "GL 4.6 isn't supported!\n";
-                return false;
-            }
+            GL::load();
+
             resizeViewport();
             updateShouldRender();
+
+            vkfwSetupCallbacksForWindow();
+
             return true;
         }
         inline void resize(size_t newWidth, size_t newHeight){
@@ -55,9 +79,23 @@ namespace Render{
         }
         private:
         inline void updateShouldRender(){ shouldRender = !(width == 0 || height == 0); }
-        inline void resizeViewport(){
-            glViewport(0, 0, this->width, this->height);
+        inline void resizeViewport(){ glViewport(0, 0, this->width, this->height); }
+        static void default_error_callback(int error_code, const char* description){
+            std::cerr << "Error: " << description << std::endl;
         }
-        
+        inline void setMouseCapture(vkfw::CursorMode val){
+            window->set<vkfw::InputMode::Cursor>(val);
+        }
+
+        void vkfwSetupCallbacksForWindow(){
+            using namespace std::placeholders;
+            auto cb = window->callbacks();
+            cb->on_key = callbacks::vkfw::keyboard;
+            if(vkfw::rawMouseMotionSupported()){
+                window->set<vkfw::InputMode::RawMouseMotion>(true);
+            }
+            cb->on_mouse_button = callbacks::vkfw::mousebutton;
+            cb->on_cursor_move = callbacks::vkfw::mousemove;
+        }
     };
 }

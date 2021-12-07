@@ -40,14 +40,11 @@
 
 #include "render/render.h"
 #include "render/screen.h"
-#include "render/input.h"
 #include "render/camera.h"
 #include "util/util.h"
 
-
-void error_callback(int error_code, const char* description){
-    std::cerr << "Error: " << description << std::endl;
-}
+#include "input/input.h"
+#include "game/CameraController.h"
 
 enum ExitCodes: int{
     OK = 0,
@@ -110,6 +107,7 @@ class Instance{
     ShaderProgram shaderProgram;
         ShaderUniform colourScale, tex0, Umodel, Uprojview;
     Camera activeCamera;
+    Game::CameraController camctrl = Game::CameraController(activeCamera);
 
     glm::mat4 model    = glm::mat4(1.0f);
     glm::mat4 projview = glm::mat4(1.0f);
@@ -130,7 +128,7 @@ class Instance{
     }
 
     int setup(){
-        if(screen.init("Obligatory platformer", 852, 480, error_callback) == false){
+        if(screen.init("Obligatory platformer", 852, 480) == false){
             return ExitCodes::WINDOW_CREATION_ERROR;
         }
 
@@ -138,12 +136,17 @@ class Instance{
         glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         screen.present();
+        //
 
         VertexShader vertexShader(r_basicVertexFileData, r_basicVertexFileSize);
         FragmentShader fragmentShader(r_basicFragmentFileData, r_basicFragmentFileSize);
         shaderProgram = ShaderProgram(vertexShader, fragmentShader);
         vertexShader.Delete();
         fragmentShader.Delete();
+        colourScale = shaderProgram.getUniform("colourScale");
+        tex0 = shaderProgram.getUniform("tex0");
+        Umodel = shaderProgram.getUniform("model");
+        Uprojview = shaderProgram.getUniform("projview");
         
         VAO = VertexArrays(1);
         VBO = VertexBuffers(1);
@@ -170,18 +173,18 @@ class Instance{
         VertexArrays::unbind();
         ElementBuffers::unbind();
 
-
-        // Texture
+        // Texture loading
         int widthImg, heightImg, channelsImg;
         stbi_set_flip_vertically_on_load(true);
         uint8_t* textureData = stbi_load("resources/Obamium.jpg", &widthImg, &heightImg, &channelsImg, 0);
         if(textureData == nullptr){
             std::cout << stbi_failure_reason() << "\n"
-            << "Make sure you are running from the folder above `resources!`" << std::endl;
+            << "Make sure you are running from the folder above `resources`!" << std::endl;
             return ExitCodes::DATA_LOAD_FAILED;
         }
         obamium = Textures2D(1);
-        obamium.activate(0);
+        GLenum textureIndex = 0;
+        obamium.activate(textureIndex);
         obamium.use();
         Textures2D::setParamI(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         Textures2D::setParamI(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -191,21 +194,16 @@ class Instance{
         // float flatColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
         // glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, flatColor);
 
-        // 1st `0` is mipmap levels, second `0` is legacy.
-        Textures2D::setTexture2D(0, GL_RGB, widthImg, heightImg, GL_UNSIGNED_BYTE, textureData);
+        Textures2D::setTexture2D(textureIndex, GL_RGB, widthImg, heightImg, GL_UNSIGNED_BYTE, textureData);
         Textures2D::generateMipmaps();
         stbi_image_free(textureData);
         Textures2D::unbind();
 
-        colourScale = shaderProgram.getUniform("colourScale");
-        tex0 = shaderProgram.getUniform("tex0");
-        Umodel = shaderProgram.getUniform("model");
-        Uprojview = shaderProgram.getUniform("projview");
-
         projview = activeCamera.generateViewProjectionMatrix(screen.width, screen.height);
 
         shaderProgram.use();
-        tex0.setUniform(0); // Sampler2D index 0 Corresponds to activated texture 0 and so on.
+        colourScale.setUniform(1.5f);
+        tex0.setUniform((GLint)textureIndex); // Sampler2D index 0 Corresponds to activated texture 0 and so on.
         Umodel.setUniform(model);
         Uprojview.setUniform(projview);
 
@@ -213,89 +211,20 @@ class Instance{
         glEnable(GL_DEPTH_TEST); // Disable for fun
 
         screen.window->callbacks()->on_framebuffer_resize = std::bind(resize_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-        input::vkfwSetupCallbacksForWindow(*screen.window);
-        setupCameraInput(activeCamera);
+        camctrl.setupCameraInput();
         return 0;
-    }
-
-    constexpr static input::Key 
-        keyW{vkfw::Key::W},
-        keyS{vkfw::Key::S},
-        keyA{vkfw::Key::A},
-        keyD{vkfw::Key::D},
-        keySp{vkfw::Key::Space},
-        keySh{vkfw::Key::LeftShift},
-        keyLc{vkfw::MouseButton::Left},
-        keyR{vkfw::Key::R},
-        keyEsc{vkfw::Key::Escape},
-        keyQ{vkfw::Key::Q},
-        keyE{vkfw::Key::E};
-    glm::vec3 camMoveVec = glm::vec3(0.f,0.f,0.f);
-    glm::vec3 camRotVec = glm::vec3(0.f,0.f,0.f);
-    void onCameraEvent(input::InputEvent e){
-        // X Y Z
-        using namespace input::Actions;
-        static bool forward, back, left, right, up, down = false;
-        static bool pitchL, pitchR = false;
-        static bool captureMouse = false;
-        if(e.matches(keyR) ){ activeCamera.resetRotation(); }
-        if(e.matches(keyEsc, PRESS)){ captureMouse = false; }
-        if(e.matches(keyLc,  PRESS)){ captureMouse = true; }
-
-        if(e.matches(keyW) ){ forward = e.pressed(); }
-        if(e.matches(keyS) ){    back = e.pressed(); }
-        if(e.matches(keyA) ){    left = e.pressed(); }
-        if(e.matches(keyD) ){   right = e.pressed(); }
-        if(e.matches(keySp)){      up = e.pressed(); }
-        if(e.matches(keySh)){    down = e.pressed(); }
-        if(e.matches(keyQ) ){  pitchL = e.pressed(); }
-        if(e.matches(keyE) ){  pitchR = e.pressed(); }
-        auto computeCamMovVec = [&](){
-            glm::vec3 mov = glm::vec3(0.0f, 0.0f, 0.0f);
-            glm::vec3 rot = glm::vec3(0.0f, 0.0f, 0.0f);
-            if(right^left)   { mov.x = activeCamera.speed*(right-left); }
-            if(up^down)      { mov.y = activeCamera.speed*(up-down); }
-            if(forward^back) { mov.z = activeCamera.speed*(back-forward); } // -z is into page
-            if(pitchL^pitchR){ rot.z = activeCamera.speed*(pitchL-pitchR); }
-
-            camMoveVec = mov;
-            camRotVec = rot;
-        };
-        computeCamMovVec();
-    };
-    void setupCameraInput(Camera cam){
-        using namespace input;
-        using namespace input::Actions;
-        InputHandler handle = {
-            {
-                {keyEsc, PRESS|RELEASE},
-                {keyR, PRESS|RELEASE},
-                {keyW, PRESS|RELEASE},
-                {keyS, PRESS|RELEASE},
-                {keyA, PRESS|RELEASE},
-                {keyD, PRESS|RELEASE},
-                {keySp, PRESS|RELEASE},
-                {keySh, PRESS|RELEASE},
-                {keyLc, PRESS|RELEASE},
-                {keyQ, PRESS|RELEASE},
-                {keyE, PRESS|RELEASE},
-            }, std::bind(onCameraEvent, this, std::placeholders::_1)
-        };
-        inputSystem.addHandler(handle);
     }
 
     void draw(){
         if(!screen.shouldRender){ std::this_thread::sleep_for(std::chrono::milliseconds(1000/60)); }
-        screen.frameTimes.update();
+        screen.frameTimes.nextFrame();
         glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         shaderProgram.use();
-        colourScale.setUniform(1.5f);
-        // model, rotation amount (90deg/s), axis weighting
         model = glm::rotate(model, (float)glm::radians(105*screen.frameTimes.delta), glm::vec3(0.0f, 1.0f, 0.0f));
         Umodel.setUniform(model);
-        activeCamera.pos += camMoveVec * (float)screen.frameTimes.delta;
-        activeCamera.rot += camRotVec * (float)screen.frameTimes.delta;
+        activeCamera.pos += camctrl.camMoveVec * (float)screen.frameTimes.delta;
+        activeCamera.rot += camctrl.camRotVec * (float)screen.frameTimes.delta;
         projview = activeCamera.generateViewProjectionMatrix(screen.width, screen.height);
         Uprojview.setUniform(projview);
         obamium.use();
@@ -329,7 +258,6 @@ class Instance{
 
 };
 
-#include "util/registry.h"
 
 int main(){
     #ifdef OS_WINDOWS

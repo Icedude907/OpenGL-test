@@ -8,7 +8,7 @@ namespace Render{
             lastFrameTime = std::chrono::steady_clock::now();
             delta = 0.0f;
         }
-        inline void update(){
+        inline void nextFrame(){
             auto time = std::chrono::steady_clock::now();
             delta = std::chrono::duration<double>(time - lastFrameTime).count();
             lastFrameTime = time;
