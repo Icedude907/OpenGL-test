@@ -2,7 +2,7 @@
 #include <chrono>
 namespace Render{
     struct FrameTimer{
-        std::chrono::steady_clock::time_point lastFrameTime; // Relative time, shouldn't be used
+        std::chrono::steady_clock::time_point lastFrameTime; // Supposedly steady_clock is immune to system time changes
         double delta; // In seconds
         inline void start(){
             lastFrameTime = std::chrono::steady_clock::now();

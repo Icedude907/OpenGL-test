@@ -4,6 +4,7 @@
     Provides a way to hook into and filter for specific input events in an easy to use fashion
     Triggers are activated as soon as the input is recieved, not every frame or something
     - For every frame hooks, consider adding an event to a RunnableRegistry.
+I'm very proud of this.
 */
 #include <vector>
 #include <set>

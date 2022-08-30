@@ -17,10 +17,14 @@ set(glm_name "glm-${glm_version}")
 
 # building
 
-# TODO: Disable tests etc
+# Adding CMake sublibs, disable tests etc
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory("libs/${glfw_name}")
 add_subdirectory("libs/gl3w")
 add_subdirectory("libs/${glm_name}")
+
 
 add_executable(OPGL "src/main.cpp" "src/render/render.cpp" "src/util/stbinit.cpp")
 target_include_directories(OPGL PUBLIC 

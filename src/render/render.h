@@ -81,7 +81,7 @@ namespace Render{
         inline Shader(const GLchar* source, const GLint len)
         : Shader(&source, &len, 1){
         }
-        inline Shader(const Util::LenPtr<GLchar, GLint> source)
+        inline Shader(const Util::ArrPtr<GLchar, GLint> source)
         : Shader(source.ptr, source.len){
         }
 

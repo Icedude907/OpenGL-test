@@ -56,6 +56,8 @@ enum ExitCodes: int{
 };
 
 extern "C"{
+    // INCBIN is a fantastic feature why doesn't every language have this by default?
+    // If you were using Vulkan, compile the shaders on the build system to SPIR-V and then incbin the output.
     #undef INCBIN_PREFIX
     #define INCBIN_PREFIX r_
     INCBIN(char, basicVertexFile, "basic.vsh");
@@ -67,9 +69,9 @@ struct ShaderData{
     glm::vec3 col;
     glm::vec2 uv;
 };
-// using ShaderData = std::tuple<glm::vec3, glm::vec3, glm::vec2>;
-// Broked because padding
-ShaderData shaderData[] = { // positions, colours, uv maps
+// Holds: positions, colours, uv maps for every point being sent to the gpu.
+// GPU reads this data flat, but I bundle them within appropriate types (vec3 vec3 vec2) for ease of understanding.
+ShaderData shaderData[] = {
     // {{-0.5f,    -0.5f * float(sqrt(3)) / 3,     0.0f}, /* Outer left  */ {0.0f, 1.0f , 0.0f }, {0.0f, 0.0f}},
     // {{ 0.5f,    -0.5f * float(sqrt(3)) / 3,     0.0f}, /* Outer right */ {0.0f, 0.0f , 1.0f }, {1.0f, 0.0f}},
     // {{ 0.0f,     0.5f * float(sqrt(3)) * 2 / 3, 0.0f}, /* Outer top   */ {1.0f, 0.0f , 0.0f }, {0.5f, 1.0f}},
@@ -95,17 +97,19 @@ glm::vec<3, GLuint> indices[] = { // Points to use to make a tringle
     // {3, 0, 4}, // bottom TODO
 };
 
-using namespace Render; // TODO: sub in
+using namespace Render; // TODO: Remove this and sub in
 class Instance{
     public:
 
-    private: // Things are deconstructed from top to bottom
+    private: 
+    // Things are deconstructed from top to bottom. Important in our case for a clean exit.
+    // Generally don't like doing this but else it would require some cleanup + avoiding C++ JANK.
     VertexArrays VAO;
     VertexBuffers VBO;
     ElementBuffers EBO;
     Textures2D obamium;
     ShaderProgram shaderProgram;
-        ShaderUniform colourScale, tex0, Umodel, Uprojview;
+        ShaderUniform colourScale, tex0, Umodel, Uprojview; // Uniforms are the same value for each point.
     Camera activeCamera;
 
     glm::mat4 model    = glm::mat4(1.0f);
@@ -129,7 +133,7 @@ class Instance{
     }
 
     int setup(){
-        if(screen.init("Obligatory platformer", 852, 480) == false){
+        if(screen.init("GAME???", 852, 480) == false){
             return ExitCodes::WINDOW_CREATION_ERROR;
         }
 

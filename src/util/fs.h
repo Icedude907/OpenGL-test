@@ -9,7 +9,7 @@
 namespace fs{
     class File{
         public:
-        using filebuf_t = Util::LenPtr<uint8_t>;
+        using filebuf_t = Util::ArrPtr<uint8_t>;
         private:
         std::filesystem::path filepath;
         filebuf_t filebuf;
