@@ -1,7 +1,7 @@
 # OpenGL test
 ![imagehere](./docs_res/Splash.png)
 
-### Using Features
+### In-App Features
 - Capturing mouse (lclick) for camera control (esc releases)
 - Camera rotation (QE)
 - Movement (WASD, space, lshift) - doesnt orbit relative to looking direction
@@ -20,3 +20,4 @@ I can't remember my learning process exactly when starting this project, it may 
 ### Building
 - When building, build `OPGL`
 - If you wish to change the libraries with versions, make sure to update the cmake file
+- Check the `releases` tab for the libraries I used when building the project.
